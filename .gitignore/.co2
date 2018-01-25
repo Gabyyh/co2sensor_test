@@ -1,0 +1,171 @@
+#define CAYENNE_DEBUG         // Uncomment to show debug messages
+#define CAYENNE_PRINT Serial  // Comment this out to disable prints and save space
+
+#include "CayenneDefines.h"
+#include "BlynkSimpleEsp8266.h"
+#include "CayenneWiFiClient.h"
+#include "DHT.h"
+#include "SimpleTimer.h"
+#include "Wire.h"
+#include "SoftwareSerial.h"
+
+// Cayenne authentication token. This should be obtained from the Cayenne Dashboard.
+char token[] = "78aqny79tz";
+// Your network name and password.
+char ssid[] = "Linksys02471";
+char password[] = "scp0swh0bz";
+
+// Virtual Pin of the widget.
+#define VIRTUAL_PIN V1 //temp
+#define VIRTUAL_PIN V2 //hum
+#define VIRTUAL_PIN V3 //temp_chart
+#define VIRTUAL_PIN V4 //co2
+
+#define DHTPIN D4
+#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
+#define CO2_TX D0
+#define CO2_RX D1
+
+SoftwareSerial co2Serial(CO2_TX, CO2_RX); // define MH-Z19
+SimpleTimer timer;
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup()
+{
+  // initialize digital pin 2 as an output.
+  pinMode(2, OUTPUT);
+  Serial.begin(9600);
+  Cayenne.begin(token, ssid, password);
+  dht.begin();
+//timer.setInterval(10000L, sendUptime);
+
+  co2Serial.begin(9600);
+  co2Serial.flush();
+}
+
+int readCO2()
+{
+
+  byte cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79}; // command to ask for data
+  byte response[9]; // for answer
+
+  co2Serial.write(cmd, 9); //request PPM CO2
+  co2Serial.readBytes(response, 9);
+
+   while (co2Serial.available() > 0 && (unsigned char)co2Serial.peek() != 0xFF) {
+    co2Serial.read();
+  }
+
+  memset(response, 0, 9);
+  co2Serial.readBytes(response, 9);
+  
+if (response[1] != 0x86)
+  {
+    Serial.println("Invalid response from co2 sensor!");
+    return -1;
+  }
+  
+  byte crc = 0;
+  for (int i = 1; i < 8; i++)
+  {
+    crc += response[i];
+  }
+  crc = 255 - crc+1;
+  
+
+ if (response[8] == crc) {
+    int responseHigh = (int) response[2];
+    int responseLow = (int) response[3];
+    int ppm = (256 * responseHigh) + responseLow;
+    return ppm;
+  } else {
+    Serial.println("CRC error!");
+    return -1;
+  }
+}
+
+void loop()
+{
+  Cayenne.run();
+    
+
+}
+
+// This function will be called every time a Dashboard widget writes a value to Virtual Pin 2.
+CAYENNE_IN(V1)
+{
+  CAYENNE_LOG("Got a value: %s", getValue.asStr());
+  int i = getValue.asInt();
+  
+  if (i == 0)
+  {
+    digitalWrite(2, LOW);
+  }
+  else
+  {
+    digitalWrite(2, HIGH);
+  }  
+}CAYENNE_IN(V2)
+{
+  CAYENNE_LOG("Got a value: %s", getValue.asStr());
+  int i = getValue.asInt();
+  
+  if (i == 0)
+  {
+    digitalWrite(2, LOW);
+  }
+  else
+  {
+    digitalWrite(2, HIGH);
+  }  
+}
+// This function is called when the Cayenne widget requests data for the Virtual Pin.
+
+// This function is called when the Cayenne widget requests data for the Virtual Pin.
+CAYENNE_OUT(V1)
+{
+  // Read data from the sensor and send it to the virtual channel here.
+  // You can write data using virtualWrite or other Cayenne write functions.
+  // For example, to send a temperature in Celsius you can use the following:
+float t = dht.readTemperature();
+  Cayenne.virtualWrite(V1, t);}
+CAYENNE_OUT(V2)
+{
+  // Read data from the sensor and send it to the virtual channel here.
+  // You can write data using virtualWrite or other Cayenne write functions.
+  // For example, to send a temperature in Celsius you can use the following:
+float h = dht.readHumidity();
+  Cayenne.virtualWrite(V2, h);
+
+  }
+  CAYENNE_OUT(V3)
+{
+  // Read data from the sensor and send it to the virtual channel here.
+  // You can write data using virtualWrite or other Cayenne write functions.
+  // For example, to send a temperature in Celsius you can use the following:
+float t = dht.readTemperature();
+  Cayenne.virtualWrite(V3, t);
+
+  }
+
+  CAYENNE_OUT(V4)
+{
+  // Read data from the sensor and send it to the virtual channel here.
+  // You can write data using virtualWrite or other Cayenne write functions.
+  // For example, to send a temperature in Celsius you can use the following:
+//float co2_ppm = readCO2();
+int ppm = readCO2();
+
+  Serial.println(ppm);
+  
+  delay(1000);
+Cayenne.virtualWrite(V4, ppm);
+
+  }
+
+//  void sendUptime()
+//{
+//int co2_ppm = readCO2();
+//Cayenne.virtualWrite(V4, co2_ppm);
+//Serial.print(co2Serial);
+//}
