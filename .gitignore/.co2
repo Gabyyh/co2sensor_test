@@ -10,10 +10,10 @@
 #include "SoftwareSerial.h"
 
 // Cayenne authentication token. This should be obtained from the Cayenne Dashboard.
-char token[] = "78aqny79tz";
+char token[] = "";
 // Your network name and password.
-char ssid[] = "Linksys02471";
-char password[] = "scp0swh0bz";
+char ssid[] = "";
+char password[] = "";
 
 // Virtual Pin of the widget.
 #define VIRTUAL_PIN V1 //temp
